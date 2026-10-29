@@ -1,4 +1,6 @@
 // Plain config types — no external dependencies
+import { MEMORY_CONFIG_SCHEMA } from "./memory/config.js";
+import type { MemoryConfig } from "./memory/types.js";
 
 /**
  * Authorization scope for the `/fork` command (spec §5.4). v1 reads only the
@@ -18,6 +20,7 @@ export interface OctoCommandsConfig {
 }
 
 export interface OctoAccountConfig {
+  memory?: MemoryConfig;
   name?: string;
   enabled?: boolean;
   botToken?: string;
@@ -47,6 +50,7 @@ export interface OctoAccountConfig {
 }
 
 export interface OctoConfig {
+  memory?: MemoryConfig;
   name?: string;
   enabled?: boolean;
   botToken?: string;
@@ -178,6 +182,7 @@ export const OctoConfigJsonSchema = {
       botUid: { type: "string" },
       historyLimit: { type: "number", minimum: 1, maximum: 100 },
       historyPromptTemplate: { type: "string" },
+      memory: MEMORY_CONFIG_SCHEMA,
       docTasks: { type: "boolean", default: true, description: DOC_TASKS_DESCRIPTION },
       onBehalfOf: { type: "string" },
       secretsFileRoot: { type: "string", description: SECRETS_FILE_ROOT_DESCRIPTION },
@@ -202,6 +207,7 @@ export const OctoConfigJsonSchema = {
             botUid: { type: "string" },
             historyLimit: { type: "number", minimum: 1, maximum: 100 },
             historyPromptTemplate: { type: "string" },
+            memory: MEMORY_CONFIG_SCHEMA,
             docTasks: { type: "boolean", default: true, description: DOC_TASKS_DESCRIPTION },
             onBehalfOf: { type: "string" },
             secretsFileRoot: { type: "string", description: SECRETS_FILE_ROOT_DESCRIPTION },

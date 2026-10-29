@@ -33,6 +33,8 @@ export interface MessageActionResult {
   error?: string;
 }
 
+type TextDelivered = (delivery: { channelId: string; channelType: number; messageId: string; text: string }) => Promise<void>;
+
 // Re-exported so existing importers (channel.ts, tests) keep their entry point.
 export { parseTarget };
 
@@ -115,6 +117,7 @@ export async function handleOctoMessageAction(params: {
   requesterSenderId?: string;
   accountId?: string;
   log?: LogSink;
+  onTextDelivered?: TextDelivered;
 }): Promise<MessageActionResult> {
   const { action, args, apiUrl, botToken, memberMap, uidToNameMap, groupMdCache, currentChannelId, threadId, requesterSenderId, accountId, log } =
     params;
@@ -154,7 +157,8 @@ export async function handleOctoMessageAction(params: {
 
   switch (action) {
     case "send":
-      return handleSend({ args, apiUrl, botToken, memberMap, uidToNameMap, currentChannelId, threadId, log });
+      return handleSend({ args, apiUrl, botToken, memberMap, uidToNameMap, currentChannelId, threadId, log,
+        onTextDelivered: params.onTextDelivered });
     case "read":
       return handleRead({ args, apiUrl, botToken, uidToNameMap, currentChannelId, requesterSenderId, accountId, log });
     case "search":
@@ -374,6 +378,7 @@ async function handleSend(params: {
   currentChannelId?: string;
   threadId?: string | number | null;
   log?: LogSink;
+  onTextDelivered?: TextDelivered;
 }): Promise<MessageActionResult> {
   const { args, apiUrl, botToken, memberMap, uidToNameMap, currentChannelId, threadId, log } = params;
 
@@ -683,6 +688,10 @@ async function handleSend(params: {
       resolveMentions,
       log,
     });
+    if (richResult.messageId && params.onTextDelivered) {
+      await params.onTextDelivered({ channelId: effectiveChannelId, channelType: effectiveChannelType,
+        messageId: richResult.messageId, text: resolveMentions(message).finalMessage }).catch(() => {});
+    }
     return {
       ok: true,
       data: {
@@ -725,6 +734,10 @@ async function handleSend(params: {
     // even on 2xx — fall back to undefined and let the caller see no
     // messageId rather than fabricate one.
     textMessageId = sendResult?.message_id ? String(sendResult.message_id).trim() : undefined;
+    if (textMessageId && params.onTextDelivered) {
+      await params.onTextDelivered({ channelId: effectiveChannelId, channelType: effectiveChannelType,
+        messageId: textMessageId, text: finalMessage }).catch(() => {});
+    }
   }
 
   // Send media

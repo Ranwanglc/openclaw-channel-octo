@@ -20,6 +20,7 @@
     "openclaw.plugin.json",
     "CHANGELOG.md",
     "README.md",
+    "docs/graph-memory.md",
     "LICENSE"
   ],
   "scripts": {
@@ -35,6 +36,7 @@
     "verify:429-backoff": "npm run build && node scripts/verify-429-backoff.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "axios": "^1.18.1",
     "crypto-js": "^4.2.0",
     "curve25519-js": "^0.0.4",

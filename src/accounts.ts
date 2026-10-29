@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
+import type { MemoryConfig } from "./memory/types.js";
 import { DEFAULT_ACCOUNT_ID } from "./sdk-compat.js";
 import type { OctoConfig } from "./config-schema.js";
 import { getChannelConfig } from "./constants.js";
@@ -36,6 +37,7 @@ export type ResolvedOctoAccount = {
     secretsFileRoot?: string;  // Jail root for write-secret file writes
     docTasks?: boolean;  // 文档评论 @Bot 任务(常驻事件轮询 + 出站改投评论区)。**默认开启**,布尔 false 关闭
     dispatchTimeoutMs?: number;  // Explicit dispatch-timeout override; unset = derive from agents.defaults.timeoutSeconds (issue #113)
+    memory?: MemoryConfig;
   };
 };
 
@@ -139,6 +141,7 @@ export function resolveOctoAccount(params: {
       onBehalfOf: accountConfig.onBehalfOf ?? channel.onBehalfOf,
       secretsFileRoot: accountConfig.secretsFileRoot ?? channel.secretsFileRoot,
       dispatchTimeoutMs: accountConfig.dispatchTimeoutMs ?? channel.dispatchTimeoutMs,
+      memory: channel.memory || accountConfig.memory ? { ...channel.memory, ...accountConfig.memory } : undefined,
     },
   };
 }

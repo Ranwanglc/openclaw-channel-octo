@@ -4,6 +4,8 @@
 
 OpenClaw channel plugin for **Octo**. Connects via WebSocket for real-time messaging.
 
+This fork includes optional graph memory with durable message delivery, scoped recall, and an iGraph extraction backend. It is disabled by default; see [Graph memory setup](docs/graph-memory.md).
+
 ## Prerequisites
 
 - Node.js >= 22 (OpenClaw >= 2026.4.15 requires Node 22)

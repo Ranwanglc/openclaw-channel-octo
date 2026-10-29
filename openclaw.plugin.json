@@ -9,7 +9,11 @@
     "./skills"
   ],
   "contracts": {
-    "tools": ["octo_management", "octo_send_display_card", "octo_send_card"]
+    "tools": [
+      "octo_management",
+      "octo_send_display_card",
+      "octo_send_card"
+    ]
   },
   "activation": {
     "onStartup": true
@@ -162,6 +166,46 @@
                   "type": "number",
                   "minimum": 1000,
                   "description": "Per-inbound dispatch timeout in milliseconds (infrastructure backstop that releases the per-group queue when an upstream dispatch hangs). When unset, derived from agents.defaults.timeoutSeconds (default 600) as timeoutSeconds*1000 + 60000, so it always fires after the agent-run timeout. Set explicitly only when you need to decouple it from the agent timeout."
+                },
+                "memory": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Optional graph memory bridge. Disabled by default. mcpUrl points to octo-memory-graph /mcp; tokenEnv names an environment variable containing that Bot account's memory credential. Original admitted text and delivered replies are queued locally; recall has a bounded timeout.",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "mcpUrl": {
+                      "type": "string",
+                      "description": "Streamable HTTP memory MCP URL, including /mcp."
+                    },
+                    "tokenEnv": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "sourceInstance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Must match MEMORY_SOURCE_INSTANCE on the memory server."
+                    },
+                    "outboxDir": {
+                      "type": "string",
+                      "description": "Persistent per-account outbox directory; keep it across Gateway restarts."
+                    },
+                    "recallTimeoutMs": {
+                      "type": "integer",
+                      "minimum": 100,
+                      "maximum": 5000,
+                      "default": 800
+                    },
+                    "maxContextChars": {
+                      "type": "integer",
+                      "minimum": 200,
+                      "maximum": 12000,
+                      "default": 4000
+                    }
+                  }
                 }
               }
             }
@@ -187,11 +231,56 @@
                 "properties": {
                   "scope": {
                     "type": "string",
-                    "enum": ["owner-mentioned", "any-mentioned", "owner-only", "any"],
+                    "enum": [
+                      "owner-mentioned",
+                      "any-mentioned",
+                      "owner-only",
+                      "any"
+                    ],
                     "default": "owner-mentioned",
                     "description": "Authorization scope for the /fork command. v1 honors only the default (owner-mentioned); wiring inbound to read a configured value is a v1.1 TODO. The enum accepts all four values so a future config does not fail validation today."
                   }
                 }
+              }
+            }
+          },
+          "memory": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Optional graph memory bridge. Disabled by default. mcpUrl points to octo-memory-graph /mcp; tokenEnv names an environment variable containing that Bot account's memory credential. Original admitted text and delivered replies are queued locally; recall has a bounded timeout.",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false
+              },
+              "mcpUrl": {
+                "type": "string",
+                "description": "Streamable HTTP memory MCP URL, including /mcp."
+              },
+              "tokenEnv": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "sourceInstance": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Must match MEMORY_SOURCE_INSTANCE on the memory server."
+              },
+              "outboxDir": {
+                "type": "string",
+                "description": "Persistent per-account outbox directory; keep it across Gateway restarts."
+              },
+              "recallTimeoutMs": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 5000,
+                "default": 800
+              },
+              "maxContextChars": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 12000,
+                "default": 4000
               }
             }
           }
