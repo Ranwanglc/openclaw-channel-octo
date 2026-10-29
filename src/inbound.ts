@@ -58,6 +58,7 @@ import { isForkCommandHistoryMessage } from "./commands/fork-history-filter.js";
 import { isOwner } from "./owner-registry.js";
 import { isSessionInitConflict } from "./session-retry.js";
 import { isKnownBot } from "./bot-registry.js";
+import { getMemoryBridge, memoryScope } from "./memory/bridge.js";
 import { getPersonaPromptForSession } from "./persona-prompt.js";
 import { createWriteStream } from "node:fs";
 import { mkdir, unlink, readdir, stat } from "node:fs/promises";
@@ -2631,9 +2632,41 @@ export async function handleInboundMessage(params: {
     }
   }
 
+  // Capture after all admission gates. Synthetic document/card actions and OBO envelopes
+  // need their own source contracts; they must not become ordinary human DM facts.
+  let memory: ReturnType<typeof getMemoryBridge>;
+  let admittedMemoryScope: ReturnType<typeof memoryScope> | undefined;
+  let recalledMemory = "";
+  try {
+    memory = !docTask && !message.payload?.obo_origin_channel_id
+      && (message.payload.type === MessageType.Text || message.payload.type === MessageType.RichText)
+      && /^\d+$/.test(message.message_id)
+      ? getMemoryBridge(account, log) : undefined;
+    admittedMemoryScope = memory
+      ? memoryScope(message.channel_id ?? message.from_uid, message.channel_type ?? ChannelType.DM, sessionId)
+      : undefined;
+    if (memory && admittedMemoryScope) {
+      if (!isGroup) memory.rememberDirectTarget(message.from_uid, admittedMemoryScope);
+      await memory.record({
+        schema_version: 1, event_type: "message.received", message_id: String(message.message_id),
+        scope: admittedMemoryScope, speaker_id: message.from_uid,
+        speaker_kind: isFromKnownBot || memberRobotMap.get(message.from_uid) === true ? "bot"
+          : isGroup && !isConfirmedHuman ? "unknown" : "human",
+        text: rawBody, occurred_at: new Date(message.timestamp * 1000).toISOString(),
+        sequence: message.message_seq,
+        trace: { session_key: route.sessionKey, agent_id: route.agentId },
+      });
+      recalledMemory = await memory.recall(admittedMemoryScope, rawBody);
+    }
+  } catch {
+    memory = undefined;
+    admittedMemoryScope = undefined;
+    log?.warn?.("octo: memory capture unavailable; continuing the original message dispatch");
+  }
+
   const ctxPayload = core.channel.reply.finalizeInboundContext({
     Body: body,
-    BodyForAgent: body,
+    BodyForAgent: recalledMemory ? `${body}\n\n${recalledMemory}` : body,
     RawBody: rawBody,
     CommandBody: commandBody,
     BodyForCommands: commandBody,
@@ -3248,6 +3281,15 @@ export async function handleInboundMessage(params: {
       ...(effectiveOnBehalfOf ? { onBehalfOf: effectiveOnBehalfOf } : {}),
       ...(signal ? { signal } : {}),
     });
+    if (opts.intent === "output" && opts.final === true && result?.message_id && memory && admittedMemoryScope) {
+      await memory.record({
+        schema_version: 1, event_type: "assistant.delivered", message_id: String(result.message_id),
+        scope: admittedMemoryScope, speaker_id: botUid, speaker_kind: "bot", text: finalContent,
+        occurred_at: new Date().toISOString(), reply_to_message_id: String(message.message_id),
+        trace: { session_key: route.sessionKey, agent_id: route.agentId,
+          ...(effectiveOnBehalfOf ? { display_actor_id: effectiveOnBehalfOf } : {}) },
+      });
+    }
     statusSink?.({ lastOutboundAt: Date.now(), lastError: null });
     return { outputDelivered: true, finalDelivered: opts?.final === true };
   };

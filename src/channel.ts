@@ -84,6 +84,7 @@ import { preloadMentionPrefs } from "./mention-prefs.js";
 import { initPersonaPromptCache, stopPersonaPromptCache } from "./persona-prompt.js";
 import { registerOctoThreadBindingAdapter } from "./thread-binding-adapter.js";
 import { normalizeAccountId } from "./account-id.js";
+import { getMemoryBridge, registerMemoryBot, recordMemoryDelivery, closeMemoryBridge } from "./memory/bridge.js";
 import path from "node:path";
 import os from "node:os";
 import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
@@ -865,6 +866,7 @@ export const octoPlugin: ChannelPlugin<ResolvedOctoAccount> = {
         requesterSenderId: ctx.requesterSenderId ?? undefined,
         accountId,
         log: ctx.log,
+        onTextDelivered: (delivery) => recordMemoryDelivery(account, delivery, ctx.log),
       });
       // Exceptions are intentionally not caught here: the host wraps tool
       // execution in its own try/catch and depends on the throw for the
@@ -1026,7 +1028,10 @@ export const octoPlugin: ChannelPlugin<ResolvedOctoAccount> = {
         ...(replyMsgId ? { replyMsgId } : {}),
       });
 
-      return toDeliveryResult(ctx.to, sendResult);
+      const delivery = toDeliveryResult(ctx.to, sendResult);
+      await recordMemoryDelivery(account, { channelId, channelType, messageId: delivery.messageId,
+        text: finalContent, replyToId: replyMsgId });
+      return delivery;
     },
     sendMedia: async (ctx) => {
       // Resolve correct accountId — framework may pass wrong one for multi-bot setups
@@ -1302,6 +1307,8 @@ export const octoPlugin: ChannelPlugin<ResolvedOctoAccount> = {
 
       // Track this bot's uid for bot-to-bot loop prevention
       _knownBotUids.add(credentials.robot_id);
+      registerMemoryBot(account.accountId, credentials.robot_id);
+      getMemoryBridge(account, log); // Resume a persistent outbox even before the next inbound arrives.
 
       // Register owner_uid for permission checks
       if (credentials.owner_uid) {
@@ -1847,6 +1854,9 @@ export const octoPlugin: ChannelPlugin<ResolvedOctoAccount> = {
           watchdog.stop();
           deferredReconnect.cancel();
           stopPersonaPromptCache(account.accountId);
+          void closeMemoryBridge(account.accountId).catch(() => {
+            log?.warn?.("octo: memory shutdown incomplete; unsent events remain on disk");
+          });
           ctx.setStatus({
             accountId: account.accountId,
             running: false,
